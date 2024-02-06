@@ -1,0 +1,34 @@
+{
+    "name": "render-build",
+    "version": "0.1.0",
+    "description": "A Templated Site Generator Based on NodeJS",
+    "main": "rbuild.js",
+    "scripts": {
+        "test": "node test/build.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/RavelloH/RenderBuild.git"
+    },
+    "keywords": [
+        "site-generator"
+    ],
+    "author": "RavelloH",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/RavelloH/RenderBuild/issues"
+    },
+    "homepage": "https://github.com/RavelloH/RenderBuild#readme",
+    "dependencies": {
+        "chokidar": "^3.5.3",
+        "ejs": "^3.1.9",
+        "fs-extra": "^11.2.0",
+        "js-beautify": "^1.14.11",
+        "js-yaml": "^4.1.0",
+        "moment": "^2.30.1",
+        "node-cache": "^5.1.2",
+        "node-fetch": "^3.3.2",
+        "path": "^0.12.7",
+        "rlog-js": "^1.2.0"
+    }
+}
