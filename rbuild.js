@@ -10,8 +10,9 @@ const path = require('path');
 const url = require('url');
 const beautify = require('js-beautify/js');
 const chokidar = require('chokidar');
-const ejs = require('ejs')
-const yaml = require('js-yaml')
+const ejs = require('ejs');
+const yaml = require('js-yaml');
+const server = require('live-server')
 
 rlog.onExit(() => {
     rlog.warning(
@@ -31,23 +32,27 @@ const RBuild = {
         originDirectory: './origin/',
         retries: 3,
         jsBeautify: {
-            "indent_size": 4,
-            "indent_char": " ",
-            "indent_with_tabs": false,
+            indent_size: 4,
+            indent_char: ' ',
+            indent_with_tabs: false,
         },
         page: {},
         mainTemplate: 'layout.html',
         metadataFileName: 'metadata.yaml',
-        childTemplate: {},
+        childTemplate: {}
     },
     // 配置设置
     setConfig: function (object) {
-        for (let key in object) {
-            if (object.hasOwnProperty(key)) {
-                RBuild.config[key] = object[key];
+        try {
+            for (let key in object) {
+                if (object.hasOwnProperty(key)) {
+                    RBuild.config[key] = object[key];
+                }
             }
+            rlog.success('Configuration has been changed');
+        } catch (err) {
+            rlog.exit(error);
         }
-        rlog.success('Configuration has been changed');
     },
     // 配置导入
     importConfig: function (filepath) {
@@ -75,7 +80,7 @@ const RBuild = {
         }
     },
     // 初始化
-    init: function () {
+    init: async function () {
         rlog.config.setConfig(RBuild.config.RLog);
         rlog.info(`RenderBuild - v${RBuild.version}`);
         RBuild.importConfig('./config.json');
@@ -89,116 +94,154 @@ const RBuild = {
         }
         if (!this.checkDirectory(this.config.templateDirectory)) {
             rlog.exit('Unable to find folder:' + this.config.templateDirectory);
+            return false;
         }
         if (!this.checkDirectory(this.config.originDirectory)) {
             rlog.exit('Unable to find folder:' + this.config.originDirectory);
+            return false;
         }
+        return true;
     },
     // 启动构建
     build: async function (rootPath) {
-        rlog.log('Start building...')
-        let preTemplate = ''
-        let mainTemplatePath = this.processPath(this.processPath(rootPath, this.config.templateDirectory), this.config.mainTemplate)
+        // 预检查
+        if (!(await this.init())) {
+            return;
+        }
+        rlog.log('Start building...');
+        let preTemplate = '';
+        let mainTemplatePath = this.processPath(
+            this.processPath(rootPath, this.config.templateDirectory),
+            this.config.mainTemplate,
+        );
         // 模板文件预构建
         // 主模板
         if (!fs.existsSync(mainTemplatePath)) {
-            preTemplate = '<%- doc %>'
-            rlog.warning(`Main template not found. Skip pre build.`)
+            preTemplate = '<%- doc %>';
+            rlog.warning(`Main template not found. Skip pre build.`);
         } else {
-            mainTemplateContent = fs.readFileSync(mainTemplatePath).toString()
-            rlog.info(`Start to build main templates in ${mainTemplatePath}...`)
-            preTemplate = await this.singleBuild(
-                mainTemplateContent,
-                this.processPath(rootPath, this.config.templateDirectory)
-            )
-            rlog.log('Main template successfully built.')
+            try {
+                mainTemplateContent = fs.readFileSync(mainTemplatePath).toString();
+                rlog.info(`Start to build main templates in ${mainTemplatePath}...`);
+                preTemplate = await this.singleBuild(
+                    mainTemplateContent,
+                    this.processPath(rootPath, this.config.templateDirectory),
+                );
+                rlog.log('Main template successfully built.');
+            } catch (e) {
+                rlog.exit(e);
+                return;
+            }
         }
 
         // 子模板
-        let childTemplate = this.config.childTemplate
+        let childTemplate = this.config.childTemplate;
         if (Object.keys(childTemplate).length == 0) {
-            rlog.log('No child templates found, skipping child template construction')
+            rlog.log('No child templates found, skipping child template construction');
         } else {
-            rlog.info(`Starting to build ${Object.keys(childTemplate).length} child templates...`)
-
-            for (let [key, value] of Object.entries(childTemplate)) {
-                // 构建
-                let childTemplateContent = fs.readFileSync(
-                    this.processPath(
-                        rootPath,
+            rlog.info(`Starting to build ${Object.keys(childTemplate).length} child templates...`);
+            try {
+                for (let [key, value] of Object.entries(childTemplate)) {
+                    // 构建
+                    let childTemplateContent = fs
+                    .readFileSync(
                         this.processPath(
-                            this.config.templateDirectory,
-                            value.path
-                        )
+                            rootPath,
+                            this.processPath(this.config.templateDirectory, value.path),
+                        ),
                     )
-
-                ).toString()
-                childTemplate[key]['context'] = await this.singleBuild(
-                    childTemplateContent, this.processPath(
-                        rootPath,
-                        this.config.templateDirectory
-                    )
-                )
+                    .toString();
+                    childTemplate[key]['context'] = await this.singleBuild(
+                        childTemplateContent,
+                        this.processPath(rootPath, this.config.templateDirectory),
+                    );
+                }
+                rlog.log('Child template successfully built.');
+            } catch (e) {
+                rlog.exit(e);
+                return;
             }
-            rlog.log('Child template successfully built.')
         }
-
-
 
         // 资源内容导入
-        rlog.log('Start copying resource files...')
-        fs.emptyDirSync(this.config.outputDirectory)
-        let fileList = this.traversePath(this.processPath(rootPath, this.config.originDirectory))
-        fileList = this.categorizeFiles(fileList)
-        fileList.otherFiles.forEach((filePath) => {
-            this.copyFiles(
-                filePath,
-                this.moveFilePath(
+        rlog.log('Start copying resource files...');
+        let fileList;
+        try {
+            fs.emptyDirSync(this.config.outputDirectory);
+            fileList = this.traversePath(this.processPath(rootPath, this.config.originDirectory));
+            fileList = this.categorizeFiles(fileList);
+            fileList.otherFiles.forEach((filePath) => {
+                this.copyFiles(
                     filePath,
-                    this.config.originDirectory,
-                    this.config.outputDirectory
-                )
-            )
-        })
-        rlog.success('File copying completed, start building...')
+                    this.moveFilePath(
+                        filePath,
+                        this.config.originDirectory,
+                        this.config.outputDirectory,
+                    ),
+                );
+            });
+            rlog.success('File copying completed, start building...');
+        } catch (e) {
+            rlog.exit(e);
+            return;
+        }
 
         // 遍历构建
-        for (let i = 0; i < fileList.htmlFiles.length; i++) {
-            rlog.log(`Building ${fileList.htmlFiles[i]}...`)
-            let doc = fs.readFileSync(fileList.htmlFiles[i], 'utf-8')
-            doc = await this.singleBuild(doc, fileList.htmlFiles[i])
-            // 寻找元数据
-            let metaData = {}
-            if (fs.existsSync(this.convertFilePath(fileList.htmlFiles[i]))) {
-                metaData = this.yamlToObject(fs.readFileSync(this.convertFilePath(fileList.htmlFiles[i]), 'utf-8'))
+        try {
+            for (let i = 0; i < fileList.htmlFiles.length; i++) {
+                rlog.log(`Building ${fileList.htmlFiles[i]}...`);
+                let doc = fs.readFileSync(fileList.htmlFiles[i], 'utf-8');
+                doc = await this.singleBuild(doc, fileList.htmlFiles[i]);
+                // 寻找元数据
+                let metaData = {};
+                if (fs.existsSync(this.convertFilePath(fileList.htmlFiles[i]))) {
+                    metaData = this.yamlToObject(
+                        fs.readFileSync(this.convertFilePath(fileList.htmlFiles[i]), 'utf-8'),
+                    );
+                }
+                // 配置合并
+                let config = this.config.page;
+                config = this.mergeObjects(config, metaData);
+                config.doc = doc;
+                config.title = metaData.title || this.getFilename(fileList.htmlFiles[i]);
+                config.keywords = metaData.keywords || '';
+                config.description = metaData.description || '';
+                config.pagetype = metaData.pagetype || '';
+                config.url =
+                config.siteUrl +
+                this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory);
+                config.pageJs = metaData.pageJsPath
+                ? `<script>${fs.readFileSync(
+                    this.convertFilePath(fileList.htmlFiles[i], metaData.pageJsPath),
+                )}</script>`: this.config.page.defaultScript;
+                config.prefetch = metaData.prefetch || [];
+
+                doc = ejs.render(preTemplate, config);
+
+                // 保存文件
+                this.writeFile(
+                    this.processPath(
+                        this.config.outputDirectory,
+                        this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory),
+                    ),
+                    doc,
+                );
             }
-            // 配置合并
-            let config = this.config.page
-            config = this.mergeObjects(config, metaData)
-            config.doc = doc
-            config.title = metaData.title || this.getFilename(fileList.htmlFiles[i])
-            config.keywords = metaData.keywords || ''
-            config.description = metaData.description || ''
-            config.pagetype = metaData.pagetype || ''
-            config.url = config.siteUrl + this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory)
-            config.pageJs = metaData.pageJsPath ? `<script>${fs.readFileSync(this.convertFilePath(fileList.htmlFiles[i], metaData.pageJsPath))}</script>`: this.config.page.defaultScript
-            config.prefetch = metaData.prefetch || []
-
-            doc = ejs.render(preTemplate, config)
-
-            // 保存文件
-            this.writeFile(this.processPath(this.config.outputDirectory, this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory)), doc)
-
+            rlog.success('Build completed.');
+        } catch (e) {
+            rlog.exit(e);
+            return;
         }
-        rlog.success('Build completed.')
 
+        // 缓存导出
+        cache.set('preTemplate', preTemplate)
     },
     // 单文件构建
     singleBuild: async function (text, path) {
         let page = text;
         let processingPath = this.getDirectoryPath(path);
         // 初次导入变量
-        page = this.processVariables(page, this.config.page)
+        page = this.processVariables(page, this.config.page);
         while (this.getTemplate(page)) {
             // 解析模板引用
             let templateName = this.getTemplate(page);
@@ -209,7 +252,7 @@ const RBuild = {
             // 替换新模板中变量
             if (this.parseTemplate(templateContent)) {
                 // 变量导入
-                templateContent = this.processVariables(templateContent, templateInfo.param)
+                templateContent = this.processVariables(templateContent, templateInfo.param);
                 // 模板路径拼接
                 let newContent = this.getAllTemplate(templateContent);
                 newContent.forEach((item) => {
@@ -231,8 +274,60 @@ const RBuild = {
         // 美化输出
         return beautify.html(page, this.config.jsBeautify);
     },
-    dev: function() {
-        // 开发模式，使用chokidar监视更改
+    dev: async function (rootPath) {
+        rlog.info('Dev mode starting...');
+        await this.build(rootPath);
+        this.config.rootPath = rootPath;
+        rlog.info('Start live build mode');
+        server.start({
+            root: this.config.outputDirectory,
+            logLevel: 0
+        })
+        rlog.success('Site is running on http://127.0.0.1:8080')
+        chokidar.watch(this.config.templateDirectory)
+        .on('change', (event, path) => {
+            this.build(RBuild.config.rootPath);
+        });
+        chokidar.watch(this.config.originDirectory).on('change', path => {
+            // 缓存导入
+            rlog.info(path)
+            rlog.info(`Rebuilding ${path}...`);
+            let doc = fs.readFileSync(path, 'utf-8');
+            this.singleBuild(doc, path).then((doc) => {
+                let preTemplate = cache.get('preTemplate')
+                let metaData = {};
+                if (fs.existsSync(this.convertFilePath(path))) {
+                    metaData = this.yamlToObject(fs.readFileSync(this.convertFilePath(path), 'utf-8'));
+                }
+                // 配置合并
+                let config = this.config.page;
+                config = this.mergeObjects(config, metaData);
+                config.doc = doc;
+                config.title = metaData.title || this.getFilename(fileList.htmlFiles[i]);
+                config.keywords = metaData.keywords || '';
+                config.description = metaData.description || '';
+                config.pagetype = metaData.pagetype || '';
+                config.url = config.siteUrl + this.getPathAfter(path, this.config.originDirectory);
+                config.pageJs = metaData.pageJsPath
+                ? `<script>${fs.readFileSync(
+                    this.convertFilePath(path, metaData.pageJsPath),
+                )}</script>`: this.config.page.defaultScript;
+                config.prefetch = metaData.prefetch || [];
+
+                doc = ejs.render(preTemplate, config);
+
+                // 保存文件
+                this.writeFile(
+                    this.processPath(
+                        this.config.outputDirectory,
+                        this.getPathAfter(path, this.config.originDirectory),
+                    ),
+                    doc,
+                );
+                rlog.info('Build finished');
+            })
+
+        });
     },
     // 找模板
     getTemplate: function (str) {
@@ -254,7 +349,7 @@ const RBuild = {
     },
     // 解析模板
     parseTemplate: function (template) {
-        const regex = /\{\{\s*([^|}\s]+)(?:\|([^}]+))?\s*\}\}/
+        const regex = /\{\{\s*([^|}\s]+)(?:\|([^}]+))?\s*\}\}/;
         const match = template.match(regex);
 
         if (match) {
@@ -294,7 +389,7 @@ const RBuild = {
     },
     // 文件读取
     readFile: async function (urls, retries = RBuild.config.retries || 3) {
-        rlog.info('Fetching '+urls)
+        rlog.info('Fetching ' + urls);
         try {
             if (urls.startsWith('http://') || urls.startsWith('https://')) {
                 const response = await fetch(urls);
@@ -316,9 +411,9 @@ const RBuild = {
         }
     },
     // 模板变量导入
-    processVariables: function(str, param, pageParam = RBuild.config.page) {
+    processVariables: function (str, param, pageParam = RBuild.config.page) {
         let variableRegex = /\{\{\{(\w+)(?:=(.*?))?\}\}\}/g;
-        let result = str.replace(variableRegex, function(match, key, pageValue) {
+        let result = str.replace(variableRegex, function (match, key, pageValue) {
             if (param.hasOwnProperty(key)) {
                 return param[key];
             }
@@ -344,12 +439,12 @@ const RBuild = {
     },
     // 找文件名
     getFilename: function (str) {
-        return str.split('\\').pop().split('/').pop()
+        return str.split('\\').pop().split('/').pop();
     },
     // 找元数据文件
-    convertFilePath: function(currentPath, newFileName = this.config.metadataFileName) {
+    convertFilePath: function (currentPath, newFileName = this.config.metadataFileName) {
         var currentDirectory = currentPath.substring(0,
-            currentPath.lastIndexOf("/") + 1);
+            currentPath.lastIndexOf('/') + 1);
         var newFilePath = currentDirectory + newFileName;
 
         return newFilePath;
@@ -365,7 +460,7 @@ const RBuild = {
         }
     },
     // 文件遍历
-    traversePath: function(directory) {
+    traversePath: function (directory) {
         let fileList = [];
 
         function traverse(directory) {
@@ -388,11 +483,11 @@ const RBuild = {
         return fileList;
     },
     // 文件分类
-    categorizeFiles: function(fileList) {
+    categorizeFiles: function (fileList) {
         let categorizedFiles = {
             htmlFiles: [],
             otherFiles: [],
-            markdownFiles: []
+            markdownFiles: [],
         };
 
         fileList.forEach((file) => {
@@ -410,8 +505,7 @@ const RBuild = {
         return categorizedFiles;
     },
     // 路径截取
-    getPathAfter: function(filePath,
-        after) {
+    getPathAfter: function (filePath, after) {
         let fileName = path.basename(filePath);
 
         let relativePath = path.relative(after,
@@ -422,15 +516,15 @@ const RBuild = {
         }
         return relativePath;
     },
-    createDirectories: function(dirPath) {
+    createDirectories: function (dirPath) {
         if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath, {
-                recursive: true
+                recursive: true,
             });
         }
     },
-    createFolder: function(dirpath, dirname) {
-        if (typeof dirname === "undefined") {
+    createFolder: function (dirpath, dirname) {
+        if (typeof dirname === 'undefined') {
             if (fs.existsSync(dirpath)) {} else {
                 createFolder(dirpath, path.dirname(dirpath));
             }
@@ -440,7 +534,7 @@ const RBuild = {
                 return;
             }
             if (fs.existsSync(dirname)) {
-                fs.mkdirSync(dirpath)
+                fs.mkdirSync(dirpath);
             } else {
                 createFolder(dirname, path.dirname(dirname));
                 fs.mkdirSync(dirpath);
@@ -448,7 +542,7 @@ const RBuild = {
         }
     },
     // yaml转Object
-    yamlToObject: function(yamlString) {
+    yamlToObject: function (yamlString) {
         try {
             const obj = yaml.load(yamlString);
             return obj;
@@ -458,7 +552,7 @@ const RBuild = {
         }
     },
     // object合并
-    mergeObjects: function(obj1, obj2) {
+    mergeObjects: function (obj1, obj2) {
         // 创建一个新的对象，用于存储融合后的结果
         var mergedObj = {};
 
@@ -475,7 +569,7 @@ const RBuild = {
         return mergedObj;
     },
     // 复制文件
-    copyFiles: function(sourcePath, targetPath) {
+    copyFiles: function (sourcePath, targetPath) {
         // 读取源文件内容
         fs.readFile(sourcePath, (err, data) => {
             if (err) throw err;
@@ -484,7 +578,7 @@ const RBuild = {
             const targetDir = path.dirname(targetPath);
             if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, {
-                    recursive: true
+                    recursive: true,
                 });
             }
 
@@ -495,12 +589,12 @@ const RBuild = {
         });
     },
     // 文件写入
-    writeFile: function(paths, data) {
+    writeFile: function (paths, data) {
         // 确保目标文件夹存在
         const targetDir = path.dirname(paths);
         if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, {
-                recursive: true
+                recursive: true,
             });
         }
 
@@ -510,7 +604,7 @@ const RBuild = {
         });
     },
     // 转路径
-    moveFilePath: function(originalPath, fromFolder, toFolder) {
+    moveFilePath: function (originalPath, fromFolder, toFolder) {
         const relativePath = path.relative(fromFolder,
             originalPath);
         const newPath = path.join(toFolder,

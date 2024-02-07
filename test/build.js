@@ -1,4 +1,3 @@
 const RBuild = require('../rbuild');
 
-RBuild.init()
-RBuild.build('./')
+RBuild.build('./');
