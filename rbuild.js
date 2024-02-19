@@ -1,4 +1,4 @@
-// RenderBuild v0.0.1
+// RenderBuild v0.3.0
 
 const Rlog = require('rlog-js');
 const moment = require('moment');
@@ -12,13 +12,13 @@ const beautify = require('js-beautify/js');
 const chokidar = require('chokidar');
 const ejs = require('ejs');
 const yaml = require('js-yaml');
-const server = require('live-server')
+const server = require('live-server');
 
 rlog.onExit(() => {
     rlog.warning(
         'RBuild stopped due to a program error. \n' +
-        'If you are unsure of the issue, please send the log to us: \n' +
-        'https://github.com/RavelloH/RBuild/issues/new',
+            'If you are unsure of the issue, please send the log to us: \n' +
+            'https://github.com/RavelloH/RBuild/issues/new',
     );
 });
 
@@ -39,7 +39,7 @@ const RBuild = {
         page: {},
         mainTemplate: 'layout.html',
         metadataFileName: 'metadata.yaml',
-        childTemplate: {}
+        childTemplate: {},
     },
     // 配置设置
     setConfig: function (object) {
@@ -144,13 +144,13 @@ const RBuild = {
                 for (let [key, value] of Object.entries(childTemplate)) {
                     // 构建
                     let childTemplateContent = fs
-                    .readFileSync(
-                        this.processPath(
-                            rootPath,
-                            this.processPath(this.config.templateDirectory, value.path),
-                        ),
-                    )
-                    .toString();
+                        .readFileSync(
+                            this.processPath(
+                                rootPath,
+                                this.processPath(this.config.templateDirectory, value.path),
+                            ),
+                        )
+                        .toString();
                     childTemplate[key]['context'] = await this.singleBuild(
                         childTemplateContent,
                         this.processPath(rootPath, this.config.templateDirectory),
@@ -208,12 +208,13 @@ const RBuild = {
                 config.description = metaData.description || '';
                 config.pagetype = metaData.pagetype || '';
                 config.url =
-                config.siteUrl +
-                this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory);
+                    config.siteUrl +
+                    this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory);
                 config.pageJs = metaData.pageJsPath
-                ? `<script>${fs.readFileSync(
-                    this.convertFilePath(fileList.htmlFiles[i], metaData.pageJsPath),
-                )}</script>`: this.config.page.defaultScript;
+                    ? `<script>${fs.readFileSync(
+                          this.convertFilePath(fileList.htmlFiles[i], metaData.pageJsPath),
+                      )}</script>`
+                    : this.config.page.defaultScript;
                 config.prefetch = metaData.prefetch || [];
 
                 doc = ejs.render(preTemplate, config);
@@ -234,12 +235,13 @@ const RBuild = {
         }
 
         // 缓存导出
-        cache.set('preTemplate', preTemplate)
+        cache.set('preTemplate', preTemplate);
     },
     // 单文件构建
     singleBuild: async function (text, path) {
         let page = text;
         let processingPath = this.getDirectoryPath(path);
+        rlog.warning(processingPath);
         // 初次导入变量
         page = this.processVariables(page, this.config.page);
         while (this.getTemplate(page)) {
@@ -281,23 +283,24 @@ const RBuild = {
         rlog.info('Start live build mode');
         server.start({
             root: this.config.outputDirectory,
-            logLevel: 0
-        })
-        rlog.success('Site is running on http://127.0.0.1:8080')
-        chokidar.watch(this.config.templateDirectory)
-        .on('change', (event, path) => {
+            logLevel: 0,
+        });
+        rlog.success('Site is running on http://127.0.0.1:8080');
+        chokidar.watch(this.config.templateDirectory).on('change', (event, path) => {
             this.build(RBuild.config.rootPath);
         });
-        chokidar.watch(this.config.originDirectory).on('change', path => {
+        chokidar.watch(this.config.originDirectory).on('change', (path) => {
             // 缓存导入
-            rlog.info(path)
+            rlog.info(path);
             rlog.info(`Rebuilding ${path}...`);
             let doc = fs.readFileSync(path, 'utf-8');
             this.singleBuild(doc, path).then((doc) => {
-                let preTemplate = cache.get('preTemplate')
+                let preTemplate = cache.get('preTemplate');
                 let metaData = {};
                 if (fs.existsSync(this.convertFilePath(path))) {
-                    metaData = this.yamlToObject(fs.readFileSync(this.convertFilePath(path), 'utf-8'));
+                    metaData = this.yamlToObject(
+                        fs.readFileSync(this.convertFilePath(path), 'utf-8'),
+                    );
                 }
                 // 配置合并
                 let config = this.config.page;
@@ -309,9 +312,10 @@ const RBuild = {
                 config.pagetype = metaData.pagetype || '';
                 config.url = config.siteUrl + this.getPathAfter(path, this.config.originDirectory);
                 config.pageJs = metaData.pageJsPath
-                ? `<script>${fs.readFileSync(
-                    this.convertFilePath(path, metaData.pageJsPath),
-                )}</script>`: this.config.page.defaultScript;
+                    ? `<script>${fs.readFileSync(
+                          this.convertFilePath(path, metaData.pageJsPath),
+                      )}</script>`
+                    : this.config.page.defaultScript;
                 config.prefetch = metaData.prefetch || [];
 
                 doc = ejs.render(preTemplate, config);
@@ -325,8 +329,7 @@ const RBuild = {
                     doc,
                 );
                 rlog.info('Build finished');
-            })
-
+            });
         });
     },
     // 找模板
@@ -355,11 +358,12 @@ const RBuild = {
         if (match) {
             const templateName = match[1];
             const params = match[2]
-            ? match[2].split('|').reduce((result, param) => {
-                const [key, value] = param.split('=');
-                result[key.trim()] = value.trim();
-                return result;
-            }, {}): {};
+                ? match[2].split('|').reduce((result, param) => {
+                      const [key, value] = param.split('=');
+                      result[key.trim()] = value.trim();
+                      return result;
+                  }, {})
+                : {};
 
             return {
                 name: templateName,
@@ -375,8 +379,9 @@ const RBuild = {
 
         // 判断是否为网络链接
         if (url.parse(startPath).protocol !== null) {
-            const parsedUrl = url.parse(startPath);
-            resultPath = url.resolve(parsedUrl.href, nextPath);
+            resultPath = url.resolve(startPath, nextPath);
+        } else if (url.parse(nextPath).protocol !== null) {
+            resultPath = nextPath;
         } else {
             // 判断是否为文件链接
             if (nextPath.startsWith('/')) {
@@ -431,11 +436,12 @@ const RBuild = {
     },
     // 找文件路径
     getDirectoryPath: function (filePath) {
-        var directoryPath = filePath.replace(/\\/g,
-            '/').replace(/\/[^\/]*$/,
-            '');
-
-        return directoryPath;
+        if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+            return filePath.replace(/(.*\/).*$/, '$1');
+        } else {
+            let directoryPath = filePath.replace(/\\/g, '/').replace(/\/[^\/]*$/, '');
+            return directoryPath;
+        }
     },
     // 找文件名
     getFilename: function (str) {
@@ -443,8 +449,7 @@ const RBuild = {
     },
     // 找元数据文件
     convertFilePath: function (currentPath, newFileName = this.config.metadataFileName) {
-        var currentDirectory = currentPath.substring(0,
-            currentPath.lastIndexOf('/') + 1);
+        var currentDirectory = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
         var newFilePath = currentDirectory + newFileName;
 
         return newFilePath;
@@ -452,8 +457,7 @@ const RBuild = {
     // 检查目录
     checkDirectory: function (directory) {
         try {
-            fs.accessSync(directory,
-                fs.constants.F_OK);
+            fs.accessSync(directory, fs.constants.F_OK);
             return true;
         } catch (err) {
             return false;
@@ -508,8 +512,7 @@ const RBuild = {
     getPathAfter: function (filePath, after) {
         let fileName = path.basename(filePath);
 
-        let relativePath = path.relative(after,
-            filePath);
+        let relativePath = path.relative(after, filePath);
 
         if (relativePath === '.') {
             return fileName;
@@ -525,7 +528,8 @@ const RBuild = {
     },
     createFolder: function (dirpath, dirname) {
         if (typeof dirname === 'undefined') {
-            if (fs.existsSync(dirpath)) {} else {
+            if (fs.existsSync(dirpath)) {
+            } else {
                 createFolder(dirpath, path.dirname(dirpath));
             }
         } else {
@@ -605,13 +609,11 @@ const RBuild = {
     },
     // 转路径
     moveFilePath: function (originalPath, fromFolder, toFolder) {
-        const relativePath = path.relative(fromFolder,
-            originalPath);
-        const newPath = path.join(toFolder,
-            relativePath);
+        const relativePath = path.relative(fromFolder, originalPath);
+        const newPath = path.join(toFolder, relativePath);
         return newPath;
     },
-    version: '0.1.0',
+    version: '0.3.0',
 };
 
 module.exports = RBuild;

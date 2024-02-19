@@ -119,7 +119,7 @@ module.exports = (req, res) => {
 
 ```ejs
 <div class="listlines">
-    <% if (articles) { %> 
+    <% if (articles) { %>
     <% for(let i = 0; i < articles.length; i++){ %>
     <div class="loading listprogram">
         <article>
