@@ -1,6 +1,6 @@
 {
     "name": "render-build",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "A Templated Site Generator Based on NodeJS",
     "main": "rbuild.js",
     "scripts": {
@@ -30,6 +30,6 @@
         "node-cache": "^5.1.2",
         "node-fetch": "^3.3.2",
         "path": "^0.12.7",
-        "rlog-js": "^1.2.0"
+        "rlog-js": "^1.3.1"
     }
 }
