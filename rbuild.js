@@ -241,7 +241,6 @@ const RBuild = {
     singleBuild: async function (text, path) {
         let page = text;
         let processingPath = this.getDirectoryPath(path);
-        rlog.warning(processingPath);
         // 初次导入变量
         page = this.processVariables(page, this.config.page);
         while (this.getTemplate(page)) {
