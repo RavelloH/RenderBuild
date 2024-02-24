@@ -207,9 +207,10 @@ const RBuild = {
                 config.keywords = metaData.keywords || '';
                 config.description = metaData.description || '';
                 config.pagetype = metaData.pagetype || '';
-                config.url =
+                config.url = (
                     config.siteUrl +
-                    this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory);
+                    this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory)
+                ).replace('index.html', '');
                 config.pageJs = metaData.pageJsPath
                     ? `<script>${fs.readFileSync(
                           this.convertFilePath(fileList.htmlFiles[i], metaData.pageJsPath),
