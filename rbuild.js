@@ -575,7 +575,7 @@ const RBuild = {
     // 复制文件
     copyFiles: function (sourcePath, targetPath) {
         // 读取源文件内容
-        fs.readFileSync(sourcePath, (err, data) => {
+        fs.readFile(sourcePath, (err, data) => {
             if (err) throw err;
 
             // 确保目标文件夹存在
