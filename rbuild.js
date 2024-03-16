@@ -575,7 +575,7 @@ const RBuild = {
     // 复制文件
     copyFiles: function (sourcePath, targetPath) {
         // 读取源文件内容
-        fs.readFile(sourcePath, (err, data) => {
+        fs.readFileSync(sourcePath, (err, data) => {
             if (err) throw err;
 
             // 确保目标文件夹存在
@@ -587,7 +587,7 @@ const RBuild = {
             }
 
             // 将源文件内容写入目标文件
-            fs.writeFile(targetPath, data, (err) => {
+            fs.writeFileSync(targetPath, data, (err) => {
                 if (err) rlog.exit(err);
             });
         });

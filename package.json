@@ -1,6 +1,6 @@
 {
     "name": "render-build",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "description": "A Templated Site Generator Based on NodeJS",
     "main": "rbuild.js",
     "scripts": {
