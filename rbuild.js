@@ -449,9 +449,8 @@ const RBuild = {
     },
     // 找元数据文件
     convertFilePath: function (currentPath, newFileName = this.config.metadataFileName) {
-        var currentDirectory = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
-        var newFilePath = currentDirectory + newFileName;
-
+        let currentDirectory = path.dirname(currentPath);
+        let newFilePath = path.join(currentDirectory, newFileName)
         return newFilePath;
     },
     // 检查目录
