@@ -26,10 +26,11 @@
         "js-beautify": "^1.14.11",
         "js-yaml": "^4.1.0",
         "live-server": "^1.2.2",
+        "markdown-it": "^14.1.0",
         "moment": "^2.30.1",
         "node-cache": "^5.1.2",
         "node-fetch": "^3.3.2",
         "path": "^0.12.7",
-        "rlog-js": "^1.4.0"
+        "rlog-js": "^1.4.2"
     }
 }

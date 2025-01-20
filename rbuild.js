@@ -1,4 +1,4 @@
-// RenderBuild v0.3.0
+// RenderBuild v0.4.0
 
 const Rlog = require('rlog-js');
 const moment = require('moment');
@@ -13,6 +13,7 @@ const chokidar = require('chokidar');
 const ejs = require('ejs');
 const yaml = require('js-yaml');
 const server = require('live-server');
+const { write } = require('fs');
 
 rlog.onExit(() => {
     rlog.warning(
@@ -221,7 +222,7 @@ const RBuild = {
                 doc = ejs.render(preTemplate, config);
 
                 // 保存文件
-                this.writeFile(
+                await this.writeFileSync(
                     this.processPath(
                         this.config.outputDirectory,
                         this.getPathAfter(fileList.htmlFiles[i], this.config.originDirectory),
@@ -321,7 +322,7 @@ const RBuild = {
                 doc = ejs.render(preTemplate, config);
 
                 // 保存文件
-                this.writeFile(
+                this.writeFileSync(
                     this.processPath(
                         this.config.outputDirectory,
                         this.getPathAfter(path, this.config.originDirectory),
@@ -399,7 +400,7 @@ const RBuild = {
             if (urls.startsWith('http://') || urls.startsWith('https://')) {
                 const response = await fetch(urls);
                 if (response.ok) {
-                    return await response.text();
+                    return response.text();
                 } else {
                     rlog.exit(`Error fetching file from urls: ${urls}`);
                 }
@@ -574,22 +575,18 @@ const RBuild = {
     // 复制文件
     copyFiles: function (sourcePath, targetPath) {
         // 读取源文件内容
-        fs.readFile(sourcePath, (err, data) => {
-            if (err) throw err;
+        const data = fs.readFileSync(sourcePath);
 
-            // 确保目标文件夹存在
-            const targetDir = path.dirname(targetPath);
-            if (!fs.existsSync(targetDir)) {
-                fs.mkdirSync(targetDir, {
-                    recursive: true,
-                });
-            }
-
-            // 将源文件内容写入目标文件
-            fs.writeFileSync(targetPath, data, (err) => {
-                if (err) rlog.exit(err);
+        // 确保目标文件夹存在
+        const targetDir = path.dirname(targetPath);
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, {
+                recursive: true,
             });
-        });
+        }
+
+        // 将源文件内容写入目标文件
+        fs.writeFileSync(targetPath, data);
     },
     // 文件写入
     writeFile: function (paths, data) {
@@ -606,13 +603,34 @@ const RBuild = {
             if (err) rlog.exit(err);
         });
     },
+    writeFileSync: async function (paths, data) {
+        // 确保目标文件夹存在
+        const targetDir = path.dirname(paths);
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, {
+                recursive: true,
+            });
+        }
+
+        // 将源文件内容写入目标文件
+        await new Promise((resolve, reject) => {
+            fs.writeFile(paths, data, (err) => {
+                if (err) {
+                    rlog.exit(err);
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    },
     // 转路径
     moveFilePath: function (originalPath, fromFolder, toFolder) {
         const relativePath = path.relative(fromFolder, originalPath);
         const newPath = path.join(toFolder, relativePath);
         return newPath;
     },
-    version: '0.3.0',
+    version: '0.4.0',
 };
 
 module.exports = RBuild;
