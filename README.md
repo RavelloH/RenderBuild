@@ -82,7 +82,7 @@ module.exports = (req, res) => {
 ```html
 <html>
     <head>
-        <title>{{{title}}}</title>
+        <title>Test</title>
     </head>
 </html>
 ```
